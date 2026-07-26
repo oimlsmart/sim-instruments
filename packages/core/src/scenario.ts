@@ -45,6 +45,25 @@ export const SCENARIOS: Record<string, Scenario> = {
     stack: 'digital',
     parameters: { ...GOOD_PARAMS, spanDriftPerDay: 0.0005 },
   },
+  // ── fidelity scenarios (spec §8.1 — honest physics, dishonest twin) ──
+  'lying-twin': {
+    id: 'lc500-lying',
+    name: 'lying-twin',
+    description: 'Honest physics; the served indication carries a firmware-mapping offset (a twin-fidelity fault — the certification must catch it).',
+    construction: 'compression',
+    stack: 'digital',
+    parameters: { ...GOOD_PARAMS },
+    fidelity: { servedOffsetKg: 0.25, servedLagS: 0 },
+  },
+  'stale-twin': {
+    id: 'lc500-stale',
+    name: 'stale-twin',
+    description: 'Honest physics and values; servedAt lags beyond freshness (a twin-freshness fault).',
+    construction: 'compression',
+    stack: 'digital',
+    parameters: { ...GOOD_PARAMS },
+    fidelity: { servedOffsetKg: 0, servedLagS: 30 },
+  },
 }
 
 export function getScenario(name: string): Scenario {
@@ -87,6 +106,12 @@ export function validateScenario(raw: unknown): Scenario {
   if (!p || typeof p !== 'object') throw new Error('scenario.parameters: required object')
   for (const k of PARAM_KEYS) {
     if (typeof p[k] !== 'number') throw new Error(`scenario.parameters.${k}: required number`)
+  }
+  const f = r.fidelity as Record<string, unknown> | undefined
+  if (f !== undefined) {
+    if (typeof f !== 'object') throw new Error('scenario.fidelity: required object when present')
+    if (typeof f.servedOffsetKg !== 'number') throw new Error('scenario.fidelity.servedOffsetKg: required number')
+    if (typeof f.servedLagS !== 'number') throw new Error('scenario.fidelity.servedLagS: required number')
   }
   return r as unknown as Scenario
 }

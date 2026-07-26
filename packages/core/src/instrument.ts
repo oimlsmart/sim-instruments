@@ -26,6 +26,8 @@ export interface InstrumentDefinition {
   construction: string | ConstructionProfile
   stack: TechnologyStack
   parameters: InstrumentParameters
+  /** twin-fidelity knobs (spec §8.1) — absent = the honest twin. */
+  fidelity?: FidelityKnobs
 }
 
 export interface GroundTruth {
@@ -37,6 +39,16 @@ export interface GroundTruth {
 }
 
 export type OperationalState = 'off' | 'warming' | 'ready' | 'fault'
+
+/** Twin-fidelity knobs (spec §8.1): dishonesty injected at the SERVED
+ *  boundary only — groundTruth() never sees them (the epistemic wall).
+ *  Default is the honest twin. */
+export interface FidelityKnobs {
+  servedOffsetKg: number
+  servedLagS: number
+}
+
+export const HONEST_FIDELITY: FidelityKnobs = { servedOffsetKg: 0, servedLagS: 0 }
 
 export class SimulatedInstrument {
   #def: InstrumentDefinition
@@ -51,6 +63,7 @@ export class SimulatedInstrument {
   #spanDriftFraction = 0
   #lastDt = 0.001
   #faults: string[] = []
+  #fidelity: FidelityKnobs = { ...HONEST_FIDELITY }
 
   constructor(def: InstrumentDefinition, clock: VirtualClock, seed: number) {
     const profile = typeof def.construction === 'string'
@@ -64,6 +77,7 @@ export class SimulatedInstrument {
     this.#trans = new TransductionStage(def.parameters)
     this.#cond = new ConditioningStage({ ...def.parameters, stack: def.stack }, normal(mulberry32(seed)))
     this.#poweredAt = clock.now()
+    if (def.fidelity) this.#fidelity = { ...def.fidelity }
     clock.onAdvance(dt => this.#tick(dt))
   }
 
@@ -93,7 +107,7 @@ export class SimulatedInstrument {
     const out = this.#cond.process(bridge * warm, this.#lastDt, this.#env, this.#kgPerMVperV)
     this.#faults = out.faults
     if (out.faults.length > 0 && this.#state === 'ready') this.#state = 'fault'
-    return qty(out.indicationKg, 'kg')
+    return qty(out.indicationKg + this.#fidelity.servedOffsetKg, 'kg')
   }
 
   /** First-order warm-up envelope on the electronics (spec §4.4). */
@@ -103,8 +117,12 @@ export class SimulatedInstrument {
     return tau <= 0 ? 1 : 1 - Math.exp(-t / tau) * 0.001 // residual settles to 0.1 % then 0
   }
 
-  servedAt(): number { return this.#clock.now() }
+  servedAt(): number { return this.#clock.now() - this.#fidelity.servedLagS }
   operationalState(): OperationalState { return this.#state }
+
+  /** /world-only operation (spec §8.1): the certification-wind-tunnel
+   *  knob. Never reachable from /twin. */
+  setFidelity(knobs: FidelityKnobs): void { this.#fidelity = { ...knobs } }
 
   groundTruth(): GroundTruth {
     return {
