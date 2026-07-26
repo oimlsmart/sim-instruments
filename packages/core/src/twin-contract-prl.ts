@@ -1,9 +1,28 @@
 // twin-contract-prl.ts — the build-time adapter: parse a Primmel
 // product package into a TwinContract (spec §6/§9). This module is
 // the ONLY primmel-ts consumer in the runtime tree — standalone boots
-// ride the BAKED contract (twin-bake.ts) and never import it.
-import { loadPackage } from '@primmel/primmel'
+// ride the BAKED contract (twin-bake.ts) and never import it. The
+// primmel-ts import is LAZY (a build-time-only tool): the package
+// need not be present for typecheck or for any baked-contract path
+// (CI runs without the private primmel-ts checkout).
 import type { TwinContract, TwinOperation, ServeDeclaration } from './twin-contract.js'
+
+type LoadPackage = (dir: string) => Promise<unknown>
+const PRIMMEL_SPEC = '@primmel/primmel'
+let cached: LoadPackage | undefined
+async function primmelLoad(): Promise<LoadPackage> {
+  if (!cached) {
+    // non-literal specifier: TS must not require the module statically
+    const mod = await import(PRIMMEL_SPEC).catch(() => {
+      throw new Error(
+        '@primmel/primmel is not installed — the .prl adapter is a build-time tool. ' +
+        'Point the primmel-ts checkout at it (the @primmel/primmel file: dependency), or use the baked contract (twin-bake.ts).',
+      )
+    }) as { loadPackage: LoadPackage }
+    cached = mod.loadPackage
+  }
+  return cached
+}
 
 interface RawOperation { name: string; kind: string; serves?: string[] }
 interface RawEndpoint { id: string; operations?: RawOperation[] }
@@ -33,6 +52,7 @@ const OP_KIND: Record<string, TwinOperation['kind']> = { query: 'query', subscri
  *  HAS-level bindings + every operation-served register (uncovered
  *  registers inherit their operation's binding freshness). */
 export async function parseTwinContract(pkgDir: string): Promise<TwinContract> {
+  const loadPackage = await primmelLoad()
   const pkg = await loadPackage(pkgDir) as { packageManifest?: { id?: string }; subjects?: RawSubject[]; subject?: RawSubject }
   const subject = pkg.subjects?.[0] ?? pkg.subject ?? {}
   const endpoints: RawEndpoint[] = subject.is?.endpoints ?? []
