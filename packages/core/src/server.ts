@@ -31,6 +31,8 @@ const MIME: Record<string, string> = {
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
 }
 
+const TWIN_PLACEHOLDER_MESSAGE = 'twin schema not generated/baked — pass twinSchema to createSimServer (see docs §6/§9)'
+
 function landing(title: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
 <style>body{font-family:system-ui,sans-serif;margin:3rem auto;max-width:44rem;line-height:1.5}
@@ -48,20 +50,26 @@ code{background:#f2f2f2;padding:.1em .3em;border-radius:4px}</style></head><body
 export async function createSimServer(opts: SimServerOptions): Promise<SimServer> {
   const title = opts.title ?? 'simulated instrument'
   const worldYoga = createYoga<{ req: Request }>({ schema: opts.worldSchema, graphqlEndpoint: '/world', graphiql: true })
-  const twinYoga = createYoga<{ req: Request }>({
-    schema: opts.twinSchema ?? createSchema({
-      typeDefs: `type Query { _twinPlaceholder: String }`,
-      resolvers: {
-        Query: {
-          _twinPlaceholder: () => {
-            throw new GraphQLError('twin schema not generated/baked — pass twinSchema to createSimServer (see docs §6/§9)')
+  const twinYoga = opts.twinSchema
+    ? createYoga<{ req: Request }>({ schema: opts.twinSchema, graphqlEndpoint: '/twin', graphiql: true })
+    : createYoga<{ req: Request }>({
+        schema: createSchema({
+          typeDefs: `type Query { _twinPlaceholder: String }`,
+          resolvers: {
+            Query: {
+              _twinPlaceholder: () => {
+                throw new GraphQLError(TWIN_PLACEHOLDER_MESSAGE)
+              },
+            },
           },
-        },
-      },
-    }),
-    graphqlEndpoint: '/twin',
-    graphiql: true,
-  })
+        }),
+        graphqlEndpoint: '/twin',
+        graphiql: true,
+        // the placeholder IS the masked message: any resolver error
+        // reaches the client as exactly this text, independent of
+        // error-class identity across the CJS/ESM boundary.
+        maskedErrors: { errorMessage: TWIN_PLACEHOLDER_MESSAGE },
+      })
 
   const server: Server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
