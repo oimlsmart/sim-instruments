@@ -49,12 +49,10 @@ describe('/twin schema generation (spec §6)', () => {
     const d = await gql(yoga, `query { indication { value } }`) as { indication: { value: number } }
     expect(d.indication.value).toBeCloseTo(500 + 0.25, 1)
   })
-  it('instrument-legal operations are mutations (zeroSetting, selfTest)', async () => {
+  it('instrument-legal operations are mutations (runSelfTest)', async () => {
     const { yoga } = boot()
-    const d = await gql(yoga, `mutation { selfTest { state } }`) as { selfTest: { state: string } }
-    expect(d.selfTest.state).toBeDefined()
-    const z = await gql(yoga, `mutation { zeroSetting { state } }`) as { zeroSetting: { state: string } }
-    expect(z.zeroSetting.state).toBeDefined()
+    const d = await gql(yoga, `mutation { runSelfTest { state } }`) as { runSelfTest: { state: string } }
+    expect(d.runSelfTest.state).toBeDefined()
   })
 })
 

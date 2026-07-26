@@ -24,10 +24,11 @@ export interface TwinContract {
 }
 
 /** The LC-500 contract (from primmel-packages/acme-lc500/model/lc500.prl:
- *  serve indication via get_indication { fresh_within 5s };
- *  serve state, environmental_context via watch_state { fresh_within 1s }).
- *  Kept as the canonical fixture; the .prl adapter test asserts the
- *  real package parses to exactly this. */
+ *  get_indication (query, serves indication); watch_state (subscribe,
+ *  serves state + environmental_context); run_self_test (invoke, does
+ *  self_test); serve … fresh_within 5s / 1s). Kept as the canonical
+ *  fixture; the .prl adapter test asserts the real package parses to
+ *  exactly this. */
 export const LC500_CONTRACT: TwinContract = {
   instrumentId: 'acme-lc500',
   serves: [
@@ -38,7 +39,6 @@ export const LC500_CONTRACT: TwinContract = {
   operations: [
     { id: 'get_indication', kind: 'query' },
     { id: 'watch_state', kind: 'watch' },
-    { id: 'zero_setting', kind: 'command' },
-    { id: 'self_test', kind: 'command' },
+    { id: 'run_self_test', kind: 'command' },
   ],
 }

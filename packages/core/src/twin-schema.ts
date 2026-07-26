@@ -64,9 +64,9 @@ export function generateTwinSchema(contract: TwinContract, io: TwinIo): GraphQLS
   for (const op of contract.operations) {
     if (op.kind !== 'command') continue
     const name = snakeToCamel(op.id)
-    if (op.id === 'zero_setting') mutationResolvers[name] = () => { io.instrument.removeLoad(); return { state: io.instrument.operationalState() } }
-    else if (op.id === 'self_test') mutationResolvers[name] = () => ({ state: io.instrument.operationalState() })
-    else mutationResolvers[name] = () => ({ state: io.instrument.operationalState() })
+    // v1: an invoke op returns the operational state after invoking;
+    // does-behavior wiring lands with the behavior registry (C4).
+    mutationResolvers[name] = () => ({ state: io.instrument.operationalState() })
   }
 
   return createSchema({
@@ -74,8 +74,69 @@ export function generateTwinSchema(contract: TwinContract, io: TwinIo): GraphQLS
     resolvers: {
       Query: queryResolvers,
       ...(mutationFields.length ? { Mutation: mutationResolvers } : {}),
+      ...(subscriptionFields.length ? { Subscription: subscriptionResolvers(contract, io) } : {}),
     },
   })
+}
+
+/** Watch-kind serves stream over SSE: the current value at subscribe,
+ *  then the value on every clock advance, deduped. The stream's
+ *  cancellation removes the clock listener. */
+function subscriptionResolvers(contract: TwinContract, io: TwinIo): Record<string, { subscribe: () => AsyncIterableIterator<unknown>; resolve: (payload: unknown) => unknown }> {
+  const out: Record<string, { subscribe: () => AsyncIterableIterator<unknown>; resolve: (payload: unknown) => unknown }> = {}
+  for (const serve of contract.serves) {
+    const kind = contract.operations.find(o => o.id === serve.via)?.kind ?? 'query'
+    if (kind !== 'watch') continue
+    const field = serve.target === 'environmental_context' ? 'environmentalContext' : snakeToCamel(serve.target)
+    const read = (): unknown => {
+      if (serve.target === 'state') return io.instrument.operationalState()
+      if (serve.target === 'environmental_context') return io.instrument.groundTruth().environment
+      const q = io.instrument.indication()
+      return { value: q.value, unit: q.unit, kind: q.kind, servedAt: io.instrument.servedAt() }
+    }
+    out[field] = { subscribe: () => watchStream(io.clock, read), resolve: payload => payload }
+  }
+  return out
+}
+
+/** An AsyncIterable of watch events: emits the current value
+ *  immediately, then on every clock advance (deduped by JSON
+ *  identity). */
+function watchStream<T>(clock: VirtualClock, read: () => T): AsyncIterableIterator<T> {
+  const queue: T[] = [read()]
+  let last = JSON.stringify(queue[0])
+  let notify: (() => void) | undefined
+  let done = false
+  const off = clock.onAdvance(() => {
+    const v = read()
+    const key = JSON.stringify(v)
+    if (key === last) return
+    last = key
+    queue.push(v)
+    notify?.()
+  })
+  const self: AsyncIterableIterator<T> = {
+    [Symbol.asyncIterator]() { return self },
+    next(): Promise<IteratorResult<T>> {
+      if (queue.length) return Promise.resolve({ value: queue.shift()!, done: false })
+      if (done) return Promise.resolve({ value: undefined as never, done: true })
+      return new Promise(resolve => {
+        notify = () => { notify = undefined; resolve(self.next()) }
+      })
+    },
+    return(): Promise<IteratorResult<T>> {
+      done = true
+      off()
+      notify?.()
+      return Promise.resolve({ value: undefined as never, done: true })
+    },
+    throw(e?: unknown): Promise<IteratorResult<T>> {
+      done = true
+      off()
+      return Promise.reject(e instanceof Error ? e : new Error(String(e)))
+    },
+  }
+  return self
 }
 
 export function snakeToCamel(id: string): string {
