@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,13 +14,18 @@ import { VirtualClock } from './time.js'
 import { SimulatedInstrument } from './instrument.js'
 import { getScenario } from './scenario.js'
 
-const R60_PKG = '/Users/mulgogi/src/oimlsmart/smart/primmel-packages/acme-lc500'
+// The acme-lc500 product package lives in the (private) oimlsmart/smart
+// checkout; override with SIM_ACME_LC500. CI runs without it — the
+// adapter legs skip then (the R60_PACKAGE precedent from primmel-ts);
+// the baked-artifact legs below run everywhere.
+const R60_PKG = process.env.SIM_ACME_LC500 ?? '/Users/mulgogi/src/oimlsmart/smart/primmel-packages/acme-lc500'
+const HAS_PKG = existsSync(R60_PKG)
 
 describe('parseTwinContract (the build-time adapter)', () => {
-  it('the real acme-lc500 package parses to exactly the canonical fixture', async () => {
+  it('the real acme-lc500 package parses to exactly the canonical fixture', { skip: !HAS_PKG, timeout: 30000 }, async () => {
     const contract = await parseTwinContract(R60_PKG)
     expect(contract).toEqual(LC500_CONTRACT)
-  }, 30000)
+  })
   it('parseDurationS handles the shorthand + ISO forms', () => {
     expect(parseDurationS('5s')).toBe(5)
     expect(parseDurationS('500ms')).toBe(0.5)

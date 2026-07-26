@@ -1,7 +1,11 @@
 name: ci
-on: { push: { branches: [main] }, pull_request: {} }
+on:
+  push: { branches: [main] }
+  pull_request: {}
+  schedule: [cron: '17 3 * * 1']  # weekly, Monday 03:17 UTC (off-peak)
+
 jobs:
-  gates:
+  typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -9,4 +13,103 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ matrix.node }}, cache: npm }
+      - run: npm ci
       - run: npm test
+      - name: coverage note
+        run: echo "unit + integration across workspaces (core physics, environment, schemas, server, console, twin conformance, lc500 process tests, bench smoke)"
+
+  bench-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx vite build
+        working-directory: packages/lc500/bench
+      - run: test -f packages/lc500/bench/dist/index.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-dist
+          path: packages/lc500/bench/dist
+          retention-days: 7
+
+  standalone-boot:
+    # The real user experience, proven in CI: the CLI boots zero-SMART
+    # (the committed baked contract) and serves all surfaces.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx vite build
+        working-directory: packages/lc500/bench
+      - name: boot sim-lc500 and exercise it
+        run: |
+          npx tsx packages/lc500/src/bin.ts --port 5290 &
+          SIM_PID=$!
+          trap 'kill $SIM_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5290/ 2>/dev/null || true)
+            [ "$code" = "200" ] && break; sleep 1
+          done
+          [ "$code" = "200" ] || { echo "sim did not boot"; exit 1; }
+          curl -s http://localhost:5290/ | grep -q "sim-lc500 bench"
+          curl -s -X POST http://localhost:5290/world -H 'content-type: application/json' \
+            -d '{"query":"mutation { placeLoad(massKg: 40) { groundTruth { appliedLoadKg } } }"}' | grep -q '"appliedLoadKg":40'
+          curl -s -X POST http://localhost:5290/twin -H 'content-type: application/json' \
+            -d '{"query":"{ indication { value unit } }"}' | grep -q '"unit":"kg"'
+          curl -s http://localhost:5290/world -H 'accept: text/html' | grep -qi graphiql
+          curl -s http://localhost:5290/twin -H 'accept: text/html' | grep -qi graphiql
+          echo "standalone boot + all surfaces OK"
+
+  console-session:
+    # A scripted console session (the IOS-style UX) against a booted sim.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: drive a scripted console session
+        run: |
+          printf 'enable\nplace load 40\nshow ground-truth\nadvance 5m\nshow clock\nscenario creep-cell\nexit\n' \
+            | npx tsx packages/lc500/src/bin.ts --port 5290 --console > /tmp/console.out 2>&1 &
+          CON_PID=$!
+          for i in $(seq 1 20); do grep -q '"clock": 300' /tmp/console.out 2>/dev/null && break; sleep 1; done
+          kill $CON_PID 2>/dev/null || true
+          grep -q '"appliedLoadKg": 40' /tmp/console.out
+          grep -q '"clock": 300' /tmp/console.out
+          echo "console session OK"
+
+  bake-freshness:
+    # Guards the committed baked contract against the acme-lc500
+    # package drifting — runs only where the package is present
+    # (the smart checkout; skipped on public CI until smart is public).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: re-bake and diff (skipped — needs the private smart checkout)
+        run: |
+          if [ ! -d "$SIM_ACME_LC500" ]; then
+            echo "acme-lc500 package not present (SIM_ACME_LC500 unset) — the freshness check runs where the smart checkout lives (see AGENTS.md)"
+            exit 0
+          fi
+          npx tsx packages/lc500/scripts/bake.ts "$SIM_ACME_LC500"
+          git diff --exit-code packages/lc500/twin/lc500.twin.json || { echo "baked contract is stale — re-bake and commit"; exit 1; }
+        env:
+          SIM_ACME_LC500: ${{ vars.SIM_ACME_LC500 }}
