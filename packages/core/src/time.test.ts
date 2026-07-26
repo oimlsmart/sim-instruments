@@ -24,6 +24,9 @@ describe('VirtualClock', () => {
     expect(Math.abs(t0 - Date.now() / 1000)).toBeLessThan(2)
     c.setMode('manual')
     c.advance(5)
-    expect(c.now()).toBeCloseTo(t0 + 5, 6)
+    // advance adds exactly 5 to wherever the flip left the clock
+    // (the flip rebases to the flip-time epoch, a few ms after t0)
+    expect(c.now()).toBeGreaterThanOrEqual(t0 + 5)
+    expect(c.now()).toBeLessThan(t0 + 6)
   })
 })

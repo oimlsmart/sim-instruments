@@ -6,7 +6,7 @@ import type { VirtualClock } from './time.js'
 import { qty, type Qty } from './physics/quantity.js'
 import { mulberry32, normal } from './physics/rng.js'
 import { MechanicalStage } from './physics/stages/mechanical.js'
-import { CONSTRUCTION_PROFILES } from './physics/families/construction.js'
+import { CONSTRUCTION_PROFILES, type ConstructionProfile } from './physics/families/construction.js'
 import { TransductionStage, type TransductionParams } from './physics/stages/transduction.js'
 import { ConditioningStage, type ConditioningParams, type TechnologyStack } from './physics/stages/conditioning.js'
 
@@ -21,7 +21,9 @@ export interface InstrumentParameters extends Omit<ConditioningParams, 'stack'>,
 
 export interface InstrumentDefinition {
   id: string
-  construction: string
+  /** a CONSTRUCTION_PROFILES id, or an inline profile (scenarios carry
+   *  tweaked profiles as data — spec §8). */
+  construction: string | ConstructionProfile
   stack: TechnologyStack
   parameters: InstrumentParameters
 }
@@ -38,6 +40,7 @@ export type OperationalState = 'off' | 'warming' | 'ready' | 'fault'
 
 export class SimulatedInstrument {
   #def: InstrumentDefinition
+  #profile: ConstructionProfile
   #clock: VirtualClock
   #mech: MechanicalStage
   #trans: TransductionStage
@@ -50,9 +53,12 @@ export class SimulatedInstrument {
   #faults: string[] = []
 
   constructor(def: InstrumentDefinition, clock: VirtualClock, seed: number) {
-    const profile = CONSTRUCTION_PROFILES[def.construction]
+    const profile = typeof def.construction === 'string'
+      ? CONSTRUCTION_PROFILES[def.construction]
+      : def.construction
     if (!profile) throw new Error(`unknown construction profile '${def.construction}' (known: ${Object.keys(CONSTRUCTION_PROFILES).join(', ')})`)
     this.#def = def
+    this.#profile = profile
     this.#clock = clock
     this.#mech = new MechanicalStage(profile, mulberry32(seed))
     this.#trans = new TransductionStage(def.parameters)
@@ -72,7 +78,7 @@ export class SimulatedInstrument {
    *  capacity × compliance = strain at capacity; sensitivity is the
    *  rated mV/V at that strain, so kgPerMVperV = capacity/sensitivity). */
   get #strainFraction(): number {
-    const atCapacity = this.#def.parameters.capacityKg * CONSTRUCTION_PROFILES[this.#def.construction]!.complianceKgPerMm
+    const atCapacity = this.#def.parameters.capacityKg * this.#profile.complianceKgPerMm
     return this.#mech.strainMm / atCapacity
   }
   get #kgPerMVperV(): number { return this.#def.parameters.capacityKg / this.#def.parameters.sensitivityMVperV }
