@@ -120,7 +120,7 @@ export class SimulatedInstrument {
   servedAt(): number { return this.#clock.now() - this.#fidelity.servedLagS }
   operationalState(): OperationalState { return this.#state }
 
-  /** /world-only operation (spec §8.1): the certification-wind-tunnel
+  /** /world-only operation (spec §8.1): the twin-certification bench
    *  knob. Never reachable from /twin. */
   setFidelity(knobs: FidelityKnobs): void { this.#fidelity = { ...knobs } }
 
