@@ -1,7 +1,7 @@
-// console/client.ts — the console executor + readline loop (spec §7).
-// show indication reads /twin; show ground-truth reads /world — the
-// console itself teaches the epistemic split.
-import { createInterface, type Interface } from 'node:readline'
+// console/client.ts — the console executor + the ConsoleIo interface
+// (spec §7). Runtime-agnostic (browser-safe): the readline loop lives
+// in console/readline.ts (node-only). show indication reads /twin;
+// everything actuating reads /world — the console teaches the split.
 import { parseCommand, PRIVILEGED_KINDS, HELP_TEXT, type ConsoleAction } from './grammar.js'
 
 export interface ConsoleIo {
@@ -23,7 +23,7 @@ function fmt(data: unknown): string {
  *  to print (empty string when nothing to print). */
 export async function execute(action: ConsoleAction, io: ConsoleIo, state: ConsoleState): Promise<string> {
   if (action.kind === 'unknown') return `% unknown command '${action.line}' — try 'help'`
-  if (PRIVILEGED_KINDS.has(action.kind) && !state.privileged) return '% privileged command — ' + "'enable' first"
+  if (PRIVILEGED_KINDS.has(action.kind) && !state.privileged) return `% privileged command — 'enable' first`
   switch (action.kind) {
     case 'help': return HELP_TEXT
     case 'enable': state.privileged = true; return ''
@@ -64,26 +64,6 @@ export async function execute(action: ConsoleAction, io: ConsoleIo, state: Conso
 
 export function promptOf(state: ConsoleState): string {
   return state.privileged ? 'sim#' : 'sim>'
-}
-
-/** The readline loop (attached by `sim-lc500 console`; tests drive
- *  execute() directly). */
-export function runConsole(io: ConsoleIo, input: NodeJS.ReadableStream, output: NodeJS.WritableStream): Interface {
-  const state: ConsoleState = { privileged: false, watching: false }
-  const rl = createInterface({ input, output, prompt: promptOf(state) })
-  io.write('sim-instruments console — type `help` (user exec) then `enable` for privileged mode\n')
-  rl.prompt()
-  rl.on('line', line => {
-    void (async () => {
-      const action = parseCommand(line)
-      if (action.kind === 'exit') { rl.close(); return }
-      const text = await execute(action, io, state)
-      if (text) io.write(text + '\n')
-      rl.setPrompt(promptOf(state))
-      rl.prompt()
-    })().catch((e: unknown) => { io.write(`% error: ${e instanceof Error ? e.message : String(e)}\n`); rl.prompt() })
-  })
-  return rl
 }
 
 /** HTTP ConsoleIo factory: POST GraphQL to `${baseUrl}${channel}`. */
