@@ -40,6 +40,7 @@ function validRecord(over: Record<string, unknown>): Record<string, unknown> {
       capacityKg: 500, scaleIntervalKg: 0.05, sensitivityMVperV: 2.0, gaugeFactor: 2.0, excitationV: 10,
       tcZeroPerDegC: 0.0001, tcSpanPerDegC: 0.0002, barometricPerKPa: 0.00005,
       referenceTempDegC: 20, referencePressureKPa: 101.325,
+      thermalHysteresisPerDegC: 0.00002, thermalHysteresisTauS: 3600,
       filterTauS: 1.0, linearizationErrorKg: 0.01, compensationResidualPerDegC: 0.0005,
       noiseSigmaKg: 0.005, warmUpTauS: 60, spanDriftPerDay: 0.000005,
     },

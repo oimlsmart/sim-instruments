@@ -14,6 +14,7 @@ export type ConsoleAction =
   | { kind: 'setClockMode'; mode: 'manual' | 'wall' }
   | { kind: 'scenario'; name: string }
   | { kind: 'setFidelity'; servedOffsetKg: number; servedLagS: number }
+  | { kind: 'setThermalHysteresis'; perDegC: number; tauS?: number }
   | { kind: 'fidelityReset' }
   | { kind: 'watch'; target: 'indication' }
   | { kind: 'reset' }
@@ -68,6 +69,9 @@ export function parseCommand(raw: string): ConsoleAction {
   m = /^set fidelity offset (-?\d+(?:\.\d+)?)(?:\s*kg)?(?:\s+lag (\d+(?:\.\d+)?)(?:\s*s)?)?$/.exec(line)
   if (m) return { kind: 'setFidelity', servedOffsetKg: Number(m[1]), servedLagS: Number(m[2] ?? 0) }
 
+  m = /^set thermal-hysteresis (\d+(?:\.\d+)?(?:e-?\d+)?)(?:\s+tau (\d+(?:\.\d+)?))?$/.exec(line)
+  if (m) return { kind: 'setThermalHysteresis', perDegC: Number(m[1]), ...(m[2] !== undefined ? { tauS: Number(m[2]) } : {}) }
+
   return { kind: 'unknown', line: raw }
 }
 
@@ -76,7 +80,7 @@ export function parseCommand(raw: string): ConsoleAction {
  *  command reaches /world anyway; the mode teaches the posture). */
 export const PRIVILEGED_KINDS: ReadonlySet<ConsoleAction['kind']> = new Set([
   'placeLoad', 'removeLoad', 'setEnvironment', 'playProfile', 'advance',
-  'setClockMode', 'scenario', 'setFidelity', 'fidelityReset', 'reset',
+  'setClockMode', 'scenario', 'setFidelity', 'setThermalHysteresis', 'fidelityReset', 'reset',
 ])
 
 export const HELP_TEXT = `user exec:
@@ -91,6 +95,7 @@ privileged:
   advance <n>s|m|h|d                        virtual time
   scenario <name>                           swap the instrument
   set fidelity offset <kg> [lag <s>]        twin-infidelity knobs (/world only)
+  set thermal-hysteresis <perDegC> [tau <s>] the post-cycle difference knob
   fidelity reset                            the honest twin
   clock mode manual|wall
   watch indication                          stream the indication

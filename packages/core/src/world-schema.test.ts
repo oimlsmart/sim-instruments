@@ -6,7 +6,7 @@ import { SimulatedInstrument } from './instrument.js'
 import { getScenario } from './scenario.js'
 
 const GET = /* GraphQL */ `
-  query { groundTruth { appliedLoadKg strainMm clockS spanDriftFraction environment { temperatureDegC } } clock }
+  query { groundTruth { appliedLoadKg strainMm clockS spanDriftFraction thermalOffsetMVperV environment { temperatureDegC } } clock }
 `
 const PLACE = /* GraphQL */ `mutation { placeLoad(massKg: 40) { groundTruth { appliedLoadKg } } }`
 
@@ -75,5 +75,17 @@ describe('/world schema (spec §7)', () => {
     const q = await gql(yoga, GET) as { groundTruth: { environment: { temperatureDegC: number } } }
     expect(q.groundTruth.environment.temperatureDegC).toBeGreaterThan(25)
     await gql(yoga, `mutation { reset { clock } }`)
+  })
+
+  it('setThermalHysteresis retunes the post-cycle difference live (the user knob)', async () => {
+    const { yoga } = boot()
+    await gql(yoga, `mutation { placeLoad(massKg: 500) { clock } }`)
+    await gql(yoga, `mutation { setThermalHysteresis(perDegC: 0.0002, tauS: 900) { clock } }`)
+    await gql(yoga, `mutation { removeLoad { clock } }`)
+    await gql(yoga, `mutation { setEnvironment(conditions: { temperatureDegC: 60 }) { clock } }`)
+    await gql(yoga, `mutation { advanceTime(seconds: 7200) { clock } }`)
+    const q = await gql(yoga, GET) as { groundTruth: { thermalOffsetMVperV: number } }
+    expect(q.groundTruth.thermalOffsetMVperV).toBeGreaterThan(0.002) // approaching 0.0002 × 40 °C
+    await expect(gql(yoga, `mutation { setThermalHysteresis(perDegC: -1) { clock } }`)).rejects.toThrow()
   })
 })

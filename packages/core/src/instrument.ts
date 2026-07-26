@@ -36,6 +36,9 @@ export interface GroundTruth {
   clockS: number
   environment: Environment
   spanDriftFraction: number
+  /** the thermal-hysteresis residual at the bridge (mV/V) — reality,
+   *  /world only. */
+  thermalOffsetMVperV: number
 }
 
 export type OperationalState = 'off' | 'warming' | 'ready' | 'fault'
@@ -74,7 +77,7 @@ export class SimulatedInstrument {
     this.#profile = profile
     this.#clock = clock
     this.#mech = new MechanicalStage(profile, mulberry32(seed))
-    this.#trans = new TransductionStage(def.parameters)
+    this.#trans = new TransductionStage({ ...def.parameters }) // own copy — setThermalHysteresis must never mutate the shared definition record
     this.#cond = new ConditioningStage({ ...def.parameters, stack: def.stack }, normal(mulberry32(seed)))
     this.#poweredAt = clock.now()
     if (def.fidelity) this.#fidelity = { ...def.fidelity }
@@ -84,6 +87,7 @@ export class SimulatedInstrument {
   #tick(dt: number): void {
     this.#lastDt = dt
     this.#mech.advance(dt)
+    this.#trans.advance(dt, this.#env)
     this.#spanDriftFraction += this.#def.parameters.spanDriftPerDay * (dt / 86400)
     if (this.#state === 'warming' && this.#clock.now() - this.#poweredAt >= 5 * this.#def.parameters.warmUpTauS) this.#state = 'ready'
   }
@@ -120,9 +124,19 @@ export class SimulatedInstrument {
   servedAt(): number { return this.#clock.now() - this.#fidelity.servedLagS }
   operationalState(): OperationalState { return this.#state }
 
-  /** /world-only operation (spec §8.1): the twin-certification bench
-   *  knob. Never reachable from /twin. */
+  /** /world-only operation: the physics knobs (spec — the post-cycle
+   *  difference is operator-configurable). Never reachable from /twin. */
   setFidelity(knobs: FidelityKnobs): void { this.#fidelity = { ...knobs } }
+
+  /** /world-only: retune the thermal-hysteresis memory live. */
+  setThermalHysteresis(perDegC: number, tauS: number): void {
+    this.#trans.setThermalHysteresis(perDegC, tauS)
+  }
+
+  /** The current thermal-hysteresis tuning (for /world queries). */
+  get thermalHysteresis(): { perDegC: number; tauS: number } {
+    return this.#trans.thermalHysteresis
+  }
 
   groundTruth(): GroundTruth {
     return {
@@ -131,6 +145,7 @@ export class SimulatedInstrument {
       clockS: this.#clock.now(),
       environment: { ...this.#env },
       spanDriftFraction: this.#spanDriftFraction,
+      thermalOffsetMVperV: this.#trans.thermalOffsetMVperV,
     }
   }
 
@@ -156,6 +171,7 @@ export const LC500_GOOD: InstrumentDefinition = {
     sensitivityMVperV: 2.0, gaugeFactor: 2.0, excitationV: 10,
     tcZeroPerDegC: 0.0001, tcSpanPerDegC: 0.0002, barometricPerKPa: 0.00005,
     referenceTempDegC: 20, referencePressureKPa: 101.325,
+    thermalHysteresisPerDegC: 0.00002, thermalHysteresisTauS: 3600,
     filterTauS: 1.0, linearizationErrorKg: 0.01, compensationResidualPerDegC: 0.0005,
     noiseSigmaKg: 0.005, warmUpTauS: 60, spanDriftPerDay: 0.000005,
   },

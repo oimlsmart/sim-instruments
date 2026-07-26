@@ -25,6 +25,7 @@ const typeDefs = /* GraphQL */ `
     strainMm: Float!
     clockS: Float!
     spanDriftFraction: Float!
+    thermalOffsetMVperV: Float!
     environment: Environment!
   }
   type WorldState { clock: Float!, mode: String!, groundTruth: GroundTruth! }
@@ -49,6 +50,7 @@ const typeDefs = /* GraphQL */ `
     setClockMode(mode: String!): WorldState!
     scenario(name: String!): WorldState!
     setFidelity(servedOffsetKg: Float, servedLagS: Float): WorldState!
+    setThermalHysteresis(perDegC: Float!, tauS: Float): WorldState!
     reset: WorldState!
   }
 `
@@ -92,6 +94,11 @@ export function buildWorldSchema(ctx: WorldContext): GraphQLSchema {
             servedOffsetKg: args.servedOffsetKg ?? current.servedOffsetKg,
             servedLagS: args.servedLagS ?? current.servedLagS,
           })
+          return worldState(ctx)
+        },
+        setThermalHysteresis: (_: unknown, args: { perDegC: number; tauS?: number }) => {
+          const current = ctx.instrument.thermalHysteresis
+          ctx.instrument.setThermalHysteresis(args.perDegC, args.tauS ?? current.tauS)
           return worldState(ctx)
         },
         reset: () => { ctx.player?.stop(); ctx.instrument.reset(); return worldState(ctx) },

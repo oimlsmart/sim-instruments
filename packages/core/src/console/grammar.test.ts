@@ -27,6 +27,8 @@ describe('console grammar (spec §7)', () => {
     expect(parseCommand('play profile damp-heat-cyclic-db')).toEqual({ kind: 'playProfile', id: 'damp-heat-cyclic-db' })
     expect(parseCommand('scenario creep-cell')).toEqual({ kind: 'scenario', name: 'creep-cell' })
     expect(parseCommand('set fidelity offset 0.25 lag 30')).toEqual({ kind: 'setFidelity', servedOffsetKg: 0.25, servedLagS: 30 })
+    expect(parseCommand('set thermal-hysteresis 0.0002 tau 1800')).toEqual({ kind: 'setThermalHysteresis', perDegC: 0.0002, tauS: 1800 })
+    expect(parseCommand('set thermal-hysteresis 0.0001')).toEqual({ kind: 'setThermalHysteresis', perDegC: 0.0001 })
     expect(parseCommand('fidelity reset')).toEqual({ kind: 'fidelityReset' })
     expect(parseCommand('clock mode wall')).toEqual({ kind: 'setClockMode', mode: 'wall' })
     expect(parseCommand('watch indication')).toEqual({ kind: 'watch', target: 'indication' })

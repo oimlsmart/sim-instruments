@@ -29,12 +29,13 @@ export const SCENARIOS: Record<string, Scenario> = {
   'temp-cell': {
     id: 'lc500-temp',
     name: 'temp-cell',
-    description: 'Excessive temperature coefficients on zero and span — fails the temperature tests.',
+    description: 'Excessive temperature coefficients on zero and span (plus a strong thermal-hysteresis memory) — fails the temperature tests.',
     construction: 'compression',
     stack: 'digital',
     parameters: {
       ...GOOD_PARAMS,
       tcZeroPerDegC: 0.001, tcSpanPerDegC: 0.002, compensationResidualPerDegC: 0.005,
+      thermalHysteresisPerDegC: 0.0002, thermalHysteresisTauS: 1800,
     },
   },
   'drift-cell': {
@@ -75,6 +76,7 @@ export function getScenario(name: string): Scenario {
 const PARAM_KEYS: Array<keyof InstrumentParameters> = [
   'capacityKg', 'scaleIntervalKg', 'sensitivityMVperV', 'gaugeFactor', 'excitationV',
   'tcZeroPerDegC', 'tcSpanPerDegC', 'barometricPerKPa', 'referenceTempDegC', 'referencePressureKPa',
+  'thermalHysteresisPerDegC', 'thermalHysteresisTauS',
   'filterTauS', 'linearizationErrorKg', 'compensationResidualPerDegC', 'noiseSigmaKg',
   'warmUpTauS', 'spanDriftPerDay',
 ]

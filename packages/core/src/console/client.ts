@@ -53,6 +53,7 @@ export async function execute(action: ConsoleAction, io: ConsoleIo, state: Conso
     case 'setClockMode': return fmt(await io.query('/world', `mutation { setClockMode(mode: "${action.mode}") { mode } }`))
     case 'scenario': return fmt(await io.query('/world', `mutation { scenario(name: "${action.name}") { clock } }`))
     case 'setFidelity': return fmt(await io.query('/world', `mutation { setFidelity(servedOffsetKg: ${action.servedOffsetKg}, servedLagS: ${action.servedLagS}) { clock } }`))
+    case 'setThermalHysteresis': return fmt(await io.query('/world', `mutation { setThermalHysteresis(perDegC: ${action.perDegC}${action.tauS !== undefined ? `, tauS: ${action.tauS}` : ''}) { clock } }`))
     case 'fidelityReset': return fmt(await io.query('/world', `mutation { setFidelity(servedOffsetKg: 0, servedLagS: 0) { clock } }`))
     case 'reset': return fmt(await io.query('/world', `mutation { reset { clock } }`))
     case 'watch': {
