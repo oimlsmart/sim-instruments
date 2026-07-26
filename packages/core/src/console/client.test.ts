@@ -47,7 +47,7 @@ describe('console scripted session (spec §7 — boot to reading)', () => {
 
     // show indication reads /twin — the honest placeholder until C3
     const ind = await run('show indication', io, state)
-    expect(ind).toMatch(/twin schema not (generated|baked)/)
+    expect(ind).toMatch(/placeholder until the twin schema lands/)
 
     // scenario swap + a D 11 profile + environment
     await run('scenario creep-cell', io, state)

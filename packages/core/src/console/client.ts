@@ -31,7 +31,11 @@ export async function execute(action: ConsoleAction, io: ConsoleIo, state: Conso
     case 'exit': return ''
     case 'show': {
       if (action.target === 'indication') {
-        return fmt(await io.query('/twin', `{ indication { value unit } }`))
+        const raw = fmt(await io.query('/twin', `{ indication { value unit } }`))
+        // the placeholder twin has no twin fields yet — say so plainly
+        return raw.includes('Cannot query field')
+          ? raw + '\n% /twin is a placeholder until the twin schema lands (C3, design §6) — this is what a certification engine would see'
+          : raw
       }
       if (action.target === 'ground-truth') return fmt(await io.query('/world', `{ groundTruth { appliedLoadKg strainMm clockS spanDriftFraction environment { temperatureDegC humidityPercentRh pressureKPa } } }`))
       if (action.target === 'environment') return fmt(await io.query('/world', `{ groundTruth { environment { temperatureDegC humidityPercentRh pressureKPa } } }`))
