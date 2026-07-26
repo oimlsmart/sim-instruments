@@ -16,6 +16,9 @@ export class MechanicalStage {
     return this.#elastic * (1 - h) + this.#creep
   }
 
+  /** The applied load as set (ground truth — never the indication). */
+  get appliedLoadKg(): number { return this.#lastLoad }
+
   setLoad(massKg: number): void {
     if (massKg < 0) throw new Error(`load must be ≥ 0, got ${massKg}`)
     this.#branch = massKg > this.#lastLoad ? 'loading' : massKg < this.#lastLoad ? 'unloading' : this.#branch
