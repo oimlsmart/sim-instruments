@@ -66,6 +66,8 @@ export class SimulatedInstrument {
   #spanDriftFraction = 0
   #lastDt = 0.001
   #faults: string[] = []
+  #faultLatched = false
+  #lastIndication: Qty | undefined
   #fidelity: FidelityKnobs = { ...HONEST_FIDELITY }
 
   constructor(def: InstrumentDefinition, clock: VirtualClock, seed: number) {
@@ -106,12 +108,17 @@ export class SimulatedInstrument {
   setEnvironment(e: Partial<Environment>): void { this.#env = { ...this.#env, ...e } }
 
   indication(): Qty {
+    // Inoperative while faulted (R 60-1, 5.7.1.2): the served
+    // indication freezes at the last computed value.
+    if (this.#faultLatched && this.#lastIndication !== undefined) return this.#lastIndication
     const bridge = this.#trans.output(this.#strainFraction, this.#env) * (1 + this.#spanDriftFraction)
     const warm = this.#warmFactor
     const out = this.#cond.process(bridge * warm, this.#lastDt, this.#env, this.#kgPerMVperV)
     this.#faults = out.faults
     if (out.faults.length > 0 && this.#state === 'ready') this.#state = 'fault'
-    return qty(out.indicationKg + this.#fidelity.servedOffsetKg, 'kg')
+    const value = qty(out.indicationKg + this.#fidelity.servedOffsetKg, 'kg')
+    if (!this.#faultLatched) this.#lastIndication = value
+    return value
   }
 
   /** First-order warm-up envelope on the electronics (spec §4.4). */
@@ -122,7 +129,28 @@ export class SimulatedInstrument {
   }
 
   servedAt(): number { return this.#clock.now() - this.#fidelity.servedLagS }
-  operationalState(): OperationalState { return this.#state }
+  operationalState(): OperationalState {
+    // A latched fault dominates: R 60-1, 5.7.1.2 — the cell is made
+    // inoperative (or a fault detection output issued) until the fault
+    // is resolved.
+    if (this.#faultLatched) return 'fault'
+    return this.#state
+  }
+
+  /** /world-only fault injection (gap B2): drive the operational state
+   *  machine to `fault` — the self_test behavior's legal outcome
+   *  (R 60-1, 5.7.1.2), not a physics cheat. The served indication
+   *  freezes (the cell is inoperative) until clearFault/reset.
+   *  Never reachable from /twin. */
+  injectFault(): void { this.#faultLatched = true }
+
+  /** Resolve a latched fault (the instrument returns to its machine
+   *  state at injection time — R 60-1, 5.7.1.2's "until the fault is
+   *  resolved"). */
+  clearFault(): void { this.#faultLatched = false }
+
+  /** The current fault latch (ground truth — /world only). */
+  get faultLatched(): boolean { return this.#faultLatched }
 
   /** /world-only operation: the physics knobs (spec — the post-cycle
    *  difference is operator-configurable). Never reachable from /twin. */
@@ -156,6 +184,8 @@ export class SimulatedInstrument {
     this.#state = 'warming'
     this.#env = { ...REFERENCE_ENVIRONMENT }
     this.#faults = []
+    this.#faultLatched = false
+    this.#lastIndication = undefined
   }
 }
 

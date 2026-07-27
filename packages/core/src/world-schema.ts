@@ -51,6 +51,8 @@ const typeDefs = /* GraphQL */ `
     scenario(name: String!): WorldState!
     setFidelity(servedOffsetKg: Float, servedLagS: Float): WorldState!
     setThermalHysteresis(perDegC: Float!, tauS: Float): WorldState!
+    injectFault: WorldState!
+    clearFault: WorldState!
     reset: WorldState!
   }
 `
@@ -101,6 +103,8 @@ export function buildWorldSchema(ctx: WorldContext): GraphQLSchema {
           ctx.instrument.setThermalHysteresis(args.perDegC, args.tauS ?? current.tauS)
           return worldState(ctx)
         },
+        injectFault: () => { ctx.instrument.injectFault(); return worldState(ctx) },
+        clearFault: () => { ctx.instrument.clearFault(); return worldState(ctx) },
         reset: () => { ctx.player?.stop(); ctx.instrument.reset(); return worldState(ctx) },
       },
     },

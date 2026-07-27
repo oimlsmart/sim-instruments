@@ -88,4 +88,21 @@ describe('/world schema (spec §7)', () => {
     expect(q.groundTruth.thermalOffsetMVperV).toBeGreaterThan(0.002) // approaching 0.0002 × 40 °C
     await expect(gql(yoga, `mutation { setThermalHysteresis(perDegC: -1) { clock } }`)).rejects.toThrow()
   })
+
+  it('injectFault drives the served state to fault and freezes the indication; clearFault resolves (R 60-1, 5.7.1.2)', async () => {
+    const { yoga, host, clock } = boot()
+    clock.advance(400)
+    await gql(yoga, `mutation { placeLoad(massKg: 500) { clock } }`)
+    clock.advance(5)
+    const before = host.instrument.indication().value
+    expect(host.instrument.operationalState()).toBe('ready')
+    await gql(yoga, `mutation { injectFault { clock } }`)
+    expect(host.instrument.operationalState()).toBe('fault')
+    clock.advance(60) // physics keeps running; the served indication must NOT move
+    const frozen = host.instrument.indication().value
+    expect(frozen).toBe(before)
+    await gql(yoga, `mutation { clearFault { clock } }`)
+    expect(host.instrument.operationalState()).toBe('ready')
+    expect(host.instrument.faultLatched).toBe(false)
+  })
 })
