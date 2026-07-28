@@ -1,11 +1,12 @@
-export type Unit = 'kg'|'degC'|'percentRh'|'kPa'|'s'|'mVperV'|'V'|'count'|'kg_per_mm'|'1'
-export type QuantityKind = 'mass'|'temperature'|'humidity'|'pressure'|'time'|'ratio'|'voltage'|'count'|'stiffness'|'dimensionless'
+export type Unit = 'kg'|'degC'|'percentRh'|'kPa'|'s'|'mVperV'|'V'|'count'|'kg_per_mm'|'ppm'|'percentVol'|'L_per_min'|'1'
+export type QuantityKind = 'mass'|'temperature'|'humidity'|'pressure'|'time'|'ratio'|'voltage'|'count'|'stiffness'|'concentration'|'flow'|'dimensionless'
 export interface Qty<K extends QuantityKind = QuantityKind> { value: number; unit: Unit; kind: K }
 
 export const UNITS: Record<Unit, QuantityKind> = {
   kg: 'mass', degC: 'temperature', percentRh: 'humidity', kPa: 'pressure',
   s: 'time', mVperV: 'ratio', V: 'voltage', count: 'count',
-  kg_per_mm: 'stiffness', '1': 'dimensionless',
+  kg_per_mm: 'stiffness', ppm: 'concentration', percentVol: 'concentration',
+  L_per_min: 'flow', '1': 'dimensionless',
 }
 
 export function qty(value: number, unit: Unit): Qty {

@@ -129,6 +129,9 @@ export class SimulatedInstrument {
   }
 
   servedAt(): number { return this.#clock.now() - this.#fidelity.servedLagS }
+  /** The sensed environmental context (the instrument's legal view —
+   *  what a real instrument's own T/RH/P sensors would report). */
+  environment(): Environment { return { ...this.#env } }
   operationalState(): OperationalState {
     // A latched fault dominates: R 60-1, 5.7.1.2 — the cell is made
     // inoperative (or a fault detection output issued) until the fault
