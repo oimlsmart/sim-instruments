@@ -6,8 +6,9 @@ export { MechanicalStage } from './physics/stages/mechanical.js'
 export { CONSTRUCTION_PROFILES, COMPRESSION, type ConstructionProfile } from './physics/families/construction.js'
 export { TransductionStage, type TransductionParams } from './physics/stages/transduction.js'
 export { ConditioningStage, type ConditioningParams, type TechnologyStack } from './physics/stages/conditioning.js'
+export { pointerPositionKg, readingUncertaintyKg, type DialSpec } from './physics/stages/dial.js'
 export {
-  SimulatedInstrument, LC500_GOOD, REFERENCE_ENVIRONMENT,
+  SimulatedInstrument, LC500_GOOD, LC500_PAIRED_DIAL, REFERENCE_ENVIRONMENT,
   type Environment, type GroundTruth, type InstrumentDefinition, type InstrumentParameters,
   type OperationalState, type FidelityKnobs, HONEST_FIDELITY,
 } from './instrument.js'
