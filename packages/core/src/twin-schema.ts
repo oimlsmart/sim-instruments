@@ -1,15 +1,40 @@
 // twin-schema.ts — the SMART digital twin interface, GENERATED from
 // the serve contract (law 2: never hand-written). spec §6.
+//
+// Generation is total: every declared serve gets a schema field AND a
+// resolver. The core registers (indication, state, environmental_context)
+// bind to the instrument's legal view; any further serve target
+// (a multi-component instrument's indication_co / indication_nox …)
+// binds to a register reader supplied by the caller — a declared serve
+// the instrument cannot answer fails generation loudly.
 import { createSchema } from 'graphql-yoga'
 import type { GraphQLSchema } from 'graphql'
 import type { VirtualClock } from './time.js'
-import type { SimulatedInstrument } from './instrument.js'
+import type { Qty } from './physics/quantity.js'
+import type { Environment } from './instrument.js'
 import type { TwinContract, TwinOperation } from './twin-contract.js'
+
+/** The instrument's legal view — what a real instrument could legally
+ *  answer (law 1). Any instrument family satisfying this shape can host
+ *  a generated /twin. */
+export interface TwinInstrumentView {
+  indication(): Qty
+  servedAt(): number
+  operationalState(): string
+  environment(): Environment
+}
 
 /** What the generated resolvers bind to (the instrument's legal view). */
 export interface TwinIo {
-  instrument: SimulatedInstrument
+  instrument: TwinInstrumentView
   clock: VirtualClock
+  /** register readers for serve targets beyond the core three — keyed
+   *  by serve target id (e.g. indication_co). Generation fails when a
+   *  declared serve has no reader. */
+  registers?: Record<string, () => unknown>
+  /** instrument-legal command implementations, keyed by operation id —
+   *  invoked by the generated Mutation before answering the state. */
+  operations?: Record<string, () => void>
 }
 
 const BASE_TYPES = /* GraphQL */ `
@@ -18,10 +43,27 @@ const BASE_TYPES = /* GraphQL */ `
   type OpResult { state: String! }
 `
 
+/** The resolver for one serve target: the core registers read the
+ *  instrument's legal view; anything further needs a caller-supplied
+ *  register reader (generation is total — never silently dropped). */
+function readerFor(target: string, io: TwinIo): () => unknown {
+  if (target === 'indication') {
+    return () => {
+      const q = io.instrument.indication()
+      return { value: q.value, unit: q.unit, kind: q.kind, servedAt: io.instrument.servedAt() }
+    }
+  }
+  if (target === 'state') return () => io.instrument.operationalState()
+  if (target === 'environmental_context') return () => io.instrument.environment()
+  const reader = io.registers?.[target]
+  if (!reader) throw new Error(`no twin register reader for serve target '${target}' — the instrument cannot answer a declared serve (law 2)`)
+  return reader
+}
+
 /** Map a serve target to its schema field (Query vs Subscription via
  *  the operation kind). Unknown targets are Query fields of
- *  ServedQuantity (the register default) and recorded for the
- *  conformance check — generation is total (never drops a serve). */
+ *  ServedQuantity (the register default) — generation is total
+ *  (never drops a serve). */
 export function generateTwinSchema(contract: TwinContract, io: TwinIo): GraphQLSchema {
   const opKind = new Map(contract.operations.map((o: TwinOperation) => [o.id, o.kind]))
 
@@ -52,21 +94,23 @@ export function generateTwinSchema(contract: TwinContract, io: TwinIo): GraphQLS
     ${subscriptionFields.length ? `type Subscription { ${subscriptionFields.join(' ')} }` : ''}
   `
 
-  const queryResolvers: Record<string, unknown> = {
-    indication: () => {
-      const q = io.instrument.indication()
-      return { value: q.value, unit: q.unit, kind: q.kind, servedAt: io.instrument.servedAt() }
-    },
-    state: () => io.instrument.operationalState(),
-    environmentalContext: () => io.instrument.groundTruth().environment,
+  const queryResolvers: Record<string, unknown> = {}
+  for (const serve of contract.serves) {
+    const field = serve.target === 'environmental_context' ? 'environmentalContext' : snakeToCamel(serve.target)
+    queryResolvers[field] = readerFor(serve.target, io)
   }
   const mutationResolvers: Record<string, () => { state: string }> = {}
   for (const op of contract.operations) {
     if (op.kind !== 'command') continue
     const name = snakeToCamel(op.id)
-    // v1: an invoke op returns the operational state after invoking;
-    // does-behavior wiring lands with the behavior registry (C4).
-    mutationResolvers[name] = () => ({ state: io.instrument.operationalState() })
+    // the caller's instrument-legal implementation runs first (v1:
+    // default is the state answer only; the behavior registry wires
+    // richer does-behaviors as they land).
+    const invoke = io.operations?.[op.id]
+    mutationResolvers[name] = () => {
+      invoke?.()
+      return { state: io.instrument.operationalState() }
+    }
   }
 
   return createSchema({
@@ -88,12 +132,7 @@ function subscriptionResolvers(contract: TwinContract, io: TwinIo): Record<strin
     const kind = contract.operations.find(o => o.id === serve.via)?.kind ?? 'query'
     if (kind !== 'watch') continue
     const field = serve.target === 'environmental_context' ? 'environmentalContext' : snakeToCamel(serve.target)
-    const read = (): unknown => {
-      if (serve.target === 'state') return io.instrument.operationalState()
-      if (serve.target === 'environmental_context') return io.instrument.groundTruth().environment
-      const q = io.instrument.indication()
-      return { value: q.value, unit: q.unit, kind: q.kind, servedAt: io.instrument.servedAt() }
-    }
+    const read = readerFor(serve.target, io)
     out[field] = { subscribe: () => watchStream(io.clock, read), resolve: payload => payload }
   }
   return out
