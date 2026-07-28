@@ -323,7 +323,7 @@ function factorySpanRefPerPpm(chDef: GasChannelDefinition): number {
  *  declared interferent maxima (CO2/H2O 20 vol% — 4.5.2), T90 ≈ 69 s
  *  < 240 s (4.6), warm-up 1 h (4.7, manufacturer-declared). */
 export const GAS_ANALYZER_GOOD: GasAnalyzerDefinition = {
-  id: 'ref-cgm-good',
+  id: 'cgm200-good',
   parameters: { warmUpTauS: 720, warmUpSpanResidual: 0.005 },
   channels: [
     {
