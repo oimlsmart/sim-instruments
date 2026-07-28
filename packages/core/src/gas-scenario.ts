@@ -30,7 +30,7 @@ export const GAS_SCENARIOS: Record<string, GasScenario> = {
     description: 'All coefficients inside R 144 limits — 7-day drift < MPE (4.8), cross-sensitivity < 0.5·MPE at 20 vol% CO2/H2O (4.5.2), T90 ≈ 69 s (4.6). Passes the test program.',
   },
   'drifting-analyzer': {
-    id: 'ref-cgm-drifting',
+    id: 'cgm200-drifting',
     name: 'drifting-analyzer',
     description: 'Zero drift 1.2 ppm/day + span drift 1 %/day — inside MPE at 24 h but beyond it by day 7 (fails the R 144-2, 1.3 seven-day drift test while passing the daily check).',
     channels: channels(
@@ -40,7 +40,7 @@ export const GAS_SCENARIOS: Record<string, GasScenario> = {
     parameters: { ...GAS_ANALYZER_GOOD.parameters },
   },
   'span-shifted': {
-    id: 'ref-cgm-span-shifted',
+    id: 'cgm200-span-shifted',
     name: 'span-shifted',
     description: 'A factory span miscalibration (+6 % span-reference error) — fails the span check at the top of the range until an instrument-legal spanCalibration against true span gas cures it.',
     channels: channels(
@@ -50,7 +50,7 @@ export const GAS_SCENARIOS: Record<string, GasScenario> = {
     parameters: { ...GAS_ANALYZER_GOOD.parameters },
   },
   'contaminated-optics': {
-    id: 'ref-cgm-contaminated',
+    id: 'cgm200-contaminated',
     name: 'contaminated-optics',
     description: 'Cell-window contamination (fraction 0.1) — adds absorbance on the CO (ndir) channel, reading ~25 ppm at zero gas, and attenuates NOx (cld) photon collection 10 %, a span loss. Zero calibration cures the CO offset; the NOx span loss needs cleaning.',
     channels: channels({}, {}),

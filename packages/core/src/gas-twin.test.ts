@@ -9,11 +9,13 @@ import { VirtualClock } from './time.js'
 import { SimulatedGasAnalyzer } from './gas-instrument.js'
 import { getGasScenario } from './gas-scenario.js'
 
-// The R 144 product reference package (the parallel SIM-R144-2 leg in
-// the smart repo) has NOT landed yet — the handshake test below is
-// skip-guarded on its presence (the LC500 pre-package precedent:
-// twin-bake.test.ts). Override the path with SIM_R144_PRODUCT.
-const R144_PKG = process.env.SIM_R144_PRODUCT ?? '/Users/mulgogi/src/oimlsmart/smart/primmel-packages/ref-cgm'
+// The R 144 product reference package (the SIM-R144-2 leg in the
+// smart repo) has LANDED as primmel-packages/acme-cgm-200 — the
+// handshake test below parses it in place and asserts it produces
+// exactly GAS_ANALYZER_CONTRACT (the LC500 precedent:
+// twin-bake.test.ts). The guard only skips when the (private) smart
+// checkout is absent (CI). Override the path with SIM_R144_PRODUCT.
+const R144_PKG = process.env.SIM_R144_PRODUCT ?? '/Users/mulgogi/src/oimlsmart/smart/primmel-packages/acme-cgm-200'
 const HAS_PKG = existsSync(R144_PKG)
 
 function boot(scenario = 'good-analyzer') {
@@ -96,13 +98,13 @@ describe('the R 144 twin (generated from the DECLARED contract — law 2)', () =
     const { schema } = boot()
     const missing = { ...GAS_ANALYZER_CONTRACT, serves: GAS_ANALYZER_CONTRACT.serves.filter(s => s.target !== 'indication_nox') }
     expect(checkTwinConformance(schema, missing).join(' ')).toContain('indicationNox')
-    const extra = { ...GAS_ANALYZER_CONTRACT, serves: [...GAS_ANALYZER_CONTRACT.serves, { target: 'indication_so2', via: 'get_indication' }] }
+    const extra = { ...GAS_ANALYZER_CONTRACT, serves: [...GAS_ANALYZER_CONTRACT.serves, { target: 'indication_so2', via: 'get_indication_co' }] }
     expect(checkTwinConformance(schema, extra).join(' ')).toContain('indication_so2')
   })
   it('a declared serve with no register reader fails GENERATION loudly', () => {
     const clock = new VirtualClock()
     const instrument = new SimulatedGasAnalyzer(getGasScenario('good-analyzer'), clock, 1)
-    const contract = { ...GAS_ANALYZER_CONTRACT, serves: [...GAS_ANALYZER_CONTRACT.serves, { target: 'indication_so2', via: 'get_indication' }] }
+    const contract = { ...GAS_ANALYZER_CONTRACT, serves: [...GAS_ANALYZER_CONTRACT.serves, { target: 'indication_so2', via: 'get_indication_co' }] }
     expect(() => generateTwinSchema(contract, { instrument, clock })).toThrow(/no twin register reader for serve target/)
   })
 })
@@ -137,7 +139,7 @@ describe('the epistemic wall (law 1)', () => {
   })
 })
 
-describe('the product-package handshake (SIM-R144-2 — skip-guarded until it lands)', () => {
+describe('the product-package handshake (SIM-R144-2 — the package is the SSOT)', () => {
   it('the real R 144 product package parses to exactly the declared contract', { skip: !HAS_PKG, timeout: 30000 }, async () => {
     const contract = await parseTwinContract(R144_PKG)
     expect(contract).toEqual(GAS_ANALYZER_CONTRACT)
