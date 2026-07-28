@@ -42,3 +42,27 @@ export const LC500_CONTRACT: TwinContract = {
     { id: 'run_self_test', kind: 'command' },
   ],
 }
+
+/** The R 144 reference-CGM contract — the DECLARED intended serves
+ *  (the SIM-R144-2 product reference package has not landed yet; when
+ *  it does, the .prl adapter test asserts the real package parses to
+ *  exactly this — the LC500_CONTRACT precedent). A dual-component CGM
+ *  serves one indication register per component; zero/span calibration
+ *  are the R 144-1, 4.8 semi-automatic adjustment means, instrument-
+ *  legal operations. */
+export const GAS_ANALYZER_CONTRACT: TwinContract = {
+  instrumentId: 'ref-cgm',
+  serves: [
+    { target: 'indication_co', via: 'get_indication', freshWithinS: 5 },
+    { target: 'indication_nox', via: 'get_indication', freshWithinS: 5 },
+    { target: 'state', via: 'watch_state', freshWithinS: 1 },
+    { target: 'environmental_context', via: 'watch_state', freshWithinS: 1 },
+  ],
+  operations: [
+    { id: 'get_indication', kind: 'query' },
+    { id: 'watch_state', kind: 'watch' },
+    { id: 'zero_calibration', kind: 'command' },
+    { id: 'span_calibration', kind: 'command' },
+    { id: 'run_self_test', kind: 'command' },
+  ],
+}
