@@ -34,12 +34,15 @@ describe('/twin schema generation (spec §6)', () => {
     expect(d.indication.kind).toBe('mass')
     expect(d.indication.servedAt).toBe(clock.now())
   })
-  it('state and environmentalContext serve from the instrument', async () => {
-    const { yoga, instrument, clock } = boot()
+  it('state serves from the instrument (the LC-500’s governed projection, TODO.v2/16)', async () => {
+    const { yoga, clock, schema } = boot()
     clock.advance(400) // past warm-up
-    const d = await gql(yoga, `query { state environmentalContext { temperatureDegC pressureKPa } }`) as { state: string; environmentalContext: { temperatureDegC: number } }
+    const d = await gql(yoga, `query { state }`) as { state: string }
     expect(d.state).toBe('ready')
-    expect(d.environmentalContext.temperatureDegC).toBe(20)
+    // environmental_context is outside the R 60 governed projection —
+    // the LC-500 no longer serves it; the gas analyzer's contract does
+    // (its binding is covered in gas-twin.test.ts).
+    expect(Object.keys(schema.getQueryType()?.getFields() ?? {})).not.toContain('environmentalContext')
   })
   it('a lying-twin serves the OFFSET indication (the served boundary, spec §8.1)', async () => {
     const { yoga, instrument, clock } = boot('lying-twin')
