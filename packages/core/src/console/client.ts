@@ -67,13 +67,18 @@ export function promptOf(state: ConsoleState): string {
   return state.privileged ? 'sim#' : 'sim>'
 }
 
-/** HTTP ConsoleIo factory: POST GraphQL to `${baseUrl}${channel}`. */
-export function httpConsoleIo(baseUrl: string, write: (t: string) => void): ConsoleIo {
+/** HTTP ConsoleIo factory: POST GraphQL to `${baseUrl}${channel}`.
+ *  The optional token rides /world requests as `Authorization: Bearer
+ *  <token>` (TODO.v2/11 — the console of a guarded sim; unset → no
+ *  header, the zero-config path). */
+export function httpConsoleIo(baseUrl: string, write: (t: string) => void, worldToken?: string): ConsoleIo {
   return {
     write,
     async query(channel, query) {
+      const headers: Record<string, string> = { 'content-type': 'application/json' }
+      if (worldToken && channel === '/world') headers['authorization'] = `Bearer ${worldToken}`
       const res = await fetch(`${baseUrl}${channel}`, {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query }),
+        method: 'POST', headers, body: JSON.stringify({ query }),
       })
       return res.json()
     },

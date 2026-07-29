@@ -71,3 +71,39 @@ describe('console scripted session (spec §7 — boot to reading)', () => {
     await run('fidelity reset', io, state)
   })
 })
+
+describe('console against a guarded sim (TODO.v2/11: the token rides /world requests)', () => {
+  const TOKEN = 's3cret-world-token'
+
+  async function bootGuarded(worldToken?: string) {
+    const clock = new VirtualClock()
+    const host: WorldContext = {
+      instrument: new SimulatedInstrument(getScenario('good-cell'), clock, 1),
+      clock,
+      swap(def) { this.instrument = new SimulatedInstrument(def, clock, 1) },
+    }
+    const server = await createSimServer({ worldSchema: buildWorldSchema(host), port: 0, worldToken: TOKEN })
+    close = server.close
+    const io = httpConsoleIo(server.url, () => {}, worldToken)
+    const state: ConsoleState = { privileged: false, watching: false }
+    return { io, state }
+  }
+
+  it('without the token the console surfaces the guard’s clear error', async () => {
+    const { io, state } = await bootGuarded()
+    await run('enable', io, state)
+    const out = await run('place load 40', io, state)
+    expect(out).toMatch(/unauthorized: \/world mutations require Authorization: Bearer/)
+    // queries still work — the console can watch reality, not touch it
+    const gt = await run('show ground-truth', io, state)
+    expect(gt).toContain('"appliedLoadKg": 0')
+  })
+
+  it('with the token the session is unchanged (mutations land)', async () => {
+    const { io, state } = await bootGuarded(TOKEN)
+    await run('enable', io, state)
+    await run('place load 40', io, state)
+    const gt = await run('show ground-truth', io, state)
+    expect(gt).toContain('"appliedLoadKg": 40')
+  })
+})
