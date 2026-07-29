@@ -9,6 +9,7 @@ import { MechanicalStage } from './physics/stages/mechanical.js'
 import { CONSTRUCTION_PROFILES, type ConstructionProfile } from './physics/families/construction.js'
 import { TransductionStage, type TransductionParams } from './physics/stages/transduction.js'
 import { ConditioningStage, type ConditioningParams, type TechnologyStack } from './physics/stages/conditioning.js'
+import type { DialSpec } from './physics/stages/dial.js'
 
 export interface Environment { temperatureDegC: number; humidityPercentRh: number; pressureKPa: number }
 
@@ -209,3 +210,11 @@ export const LC500_GOOD: InstrumentDefinition = {
     noiseSigmaKg: 0.005, warmUpTauS: 60, spanDriftPerDay: 0.000005,
   },
 }
+
+/** The paired analogue-passive indicator (spec §14, smart TODO.v2/09):
+ *  a 500 kg dial at 5 kg graduations (100 divisions; a human
+ *  interpolates to ±½ graduation = ±2.5 kg) alongside the digital
+ *  stack. Declared once here — the dial model and the bench renderer
+ *  both consume it; the smart practice flows name the same pairing as
+ *  app-side content (the repos meet over HTTP only, never by import). */
+export const LC500_PAIRED_DIAL: DialSpec = { capacityKg: 500, graduationKg: 5, unit: 'kg' }
