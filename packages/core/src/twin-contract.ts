@@ -25,8 +25,10 @@ export interface TwinContract {
 
 /** The LC-500 contract (from primmel-packages/acme-lc500/model/lc500.prl:
  *  get_indication (query, serves indication); watch_state (subscribe,
- *  serves state + environmental_context); run_self_test (invoke, does
- *  self_test); serve … fresh_within 5s / 1s). Kept as the canonical
+ *  serves state); run_self_test (invoke, does self_test); serve …
+ *  fresh_within 5s / 1s). The served surface IS the R 60 governed
+ *  projection (TODO.v2/16) — derived from the Recommendation's
+ *  twin.prl, nothing more served than governed. Kept as the canonical
  *  fixture; the .prl adapter test asserts the real package parses to
  *  exactly this. */
 export const LC500_CONTRACT: TwinContract = {
@@ -34,7 +36,6 @@ export const LC500_CONTRACT: TwinContract = {
   serves: [
     { target: 'indication', via: 'get_indication', freshWithinS: 5 },
     { target: 'state', via: 'watch_state', freshWithinS: 1 },
-    { target: 'environmental_context', via: 'watch_state', freshWithinS: 1 },
   ],
   operations: [
     { id: 'get_indication', kind: 'query' },
