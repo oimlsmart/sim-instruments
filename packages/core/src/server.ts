@@ -3,8 +3,8 @@
 // interface — generated or baked; a clear placeholder until then),
 // GraphiQL playgrounds for both, and the landing/bench at /.
 import { createServer, type Server } from 'node:http'
-import { createYoga, createSchema } from 'graphql-yoga'
-import { GraphQLError, type GraphQLSchema } from 'graphql'
+import { createYoga, createSchema, createGraphQLError, type Plugin } from 'graphql-yoga'
+import { GraphQLError, type DocumentNode, type GraphQLSchema } from 'graphql'
 import { readFile } from 'node:fs/promises'
 import { join, extname } from 'node:path'
 
@@ -19,6 +19,12 @@ export interface SimServerOptions {
   port: number
   /** landing-page title block (instrument id + scenario). */
   title?: string | undefined
+  /** bearer token guarding /world MUTATIONS (the TODO.v2/11 opt-in):
+   *  set ⇒ every world mutation requires `Authorization: Bearer
+   *  <token>`; world queries and the whole /twin channel stay open.
+   *  Absent ⇒ the world channel is fully open (the localhost dev
+   *  posture). The bins wire this from SIM_WORLD_TOKEN. */
+  worldToken?: string | undefined
 }
 
 export interface SimServer {
@@ -32,6 +38,41 @@ const MIME: Record<string, string> = {
 }
 
 const TWIN_PLACEHOLDER_MESSAGE = 'twin schema not generated/baked — pass twinSchema to createSimServer (see docs §6/§9)'
+
+/** The operation type the request will execute, honoring operationName
+ *  the way graphql-js selects it (absent → the single operation). */
+function operationTypeOf(document: DocumentNode, operationName: string | null | undefined): string | undefined {
+  for (const def of document.definitions) {
+    if (def.kind !== 'OperationDefinition') continue
+    if (operationName == null || def.name?.value === operationName) return def.operation
+  }
+  return undefined
+}
+
+/** The Authorization header off the raw node request (the yoga context
+ *  carries the IncomingMessage — see the cast in createServer below). */
+function authorizationOf(req: unknown): string | undefined {
+  const header = (req as { headers?: { authorization?: string | string[] } } | null)?.headers?.authorization
+  return Array.isArray(header) ? header[0] : header
+}
+
+/** The /world mutation guard (TODO.v2/11): an envelop plugin at the
+ *  transport edge — never in the physics. A mutation without the
+ *  bearer token is rejected 401 before any resolver runs; queries
+ *  (and named-operation documents selecting a query) pass through. */
+function worldMutationGuard(token: string): Plugin<{ req: Request }> {
+  return {
+    onExecute({ args }) {
+      if (operationTypeOf(args.document, args.operationName) !== 'mutation') return
+      if (authorizationOf(args.contextValue.req) !== `Bearer ${token}`) {
+        throw createGraphQLError(
+          'unauthorized: /world mutations require Authorization: Bearer <token> (the sim was started with SIM_WORLD_TOKEN set)',
+          { extensions: { code: 'UNAUTHORIZED', http: { status: 401, headers: { 'www-authenticate': 'Bearer realm="/world"' } } } },
+        )
+      }
+    },
+  }
+}
 
 function landing(title: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
@@ -49,7 +90,12 @@ code{background:#f2f2f2;padding:.1em .3em;border-radius:4px}</style></head><body
 
 export async function createSimServer(opts: SimServerOptions): Promise<SimServer> {
   const title = opts.title ?? 'simulated instrument'
-  const worldYoga = createYoga<{ req: Request }>({ schema: opts.worldSchema, graphqlEndpoint: '/world', graphiql: true })
+  const worldYoga = createYoga<{ req: Request }>({
+    schema: opts.worldSchema,
+    graphqlEndpoint: '/world',
+    graphiql: true,
+    plugins: opts.worldToken ? [worldMutationGuard(opts.worldToken)] : [],
+  })
   const twinYoga = opts.twinSchema
     ? createYoga<{ req: Request }>({ schema: opts.twinSchema, graphqlEndpoint: '/twin', graphiql: true })
     : createYoga<{ req: Request }>({
@@ -96,6 +142,10 @@ export async function createSimServer(opts: SimServerOptions): Promise<SimServer
     server.once('error', reject)
     server.listen(opts.port, () => resolve())
   })
+  // the honesty line (TODO.v2/11): say plainly whether /world is guarded
+  console.log(opts.worldToken
+    ? '/world mutations guarded — Authorization: Bearer <token> required (SIM_WORLD_TOKEN)'
+    : '/world channel OPEN — mutations unguarded (localhost dev posture; set SIM_WORLD_TOKEN before any non-local deployment)')
   const addr = server.address()
   const port = typeof addr === 'object' && addr ? addr.port : opts.port
   return {
