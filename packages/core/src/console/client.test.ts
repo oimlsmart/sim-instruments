@@ -107,3 +107,30 @@ describe('console against a guarded sim (TODO.v2/11: the token rides /world requ
     expect(gt).toContain('"appliedLoadKg": 40')
   })
 })
+
+describe('the tour command (the guided first run, onboarding U3)', () => {
+  it('parses: tour → the tour action', () => {
+    expect(parseCommand('tour')).toEqual({ kind: 'tour' })
+    expect(parseCommand('  TOUR ')).toEqual({ kind: 'tour' })
+  })
+
+  it('runs end to end against the real bin-side channels: narration, real outputs, the lying-twin lesson', async () => {
+    const { io, state } = await boot()
+    const text = await run('tour', io, state)
+
+    // The guide narrates the two channels and runs REAL commands through
+    // the normal machinery — the outputs carry the real physics.
+    expect(text).toContain('Welcome to the simulated load cell')
+    expect(text).toContain('"appliedLoadKg": 40')
+    // The environment sweep happened (60 °C and back).
+    expect(text).toContain('"temperatureDegC": 60')
+    // The lying-twin lesson: the creep drift is visible in the served reading.
+    expect(text).toContain('LYING TWIN')
+    expect(text).toMatch(/creep/i)
+    // The guide restores the honest instrument and hands the bench back.
+    expect(text).toContain('scenario good-cell')
+    expect(text).toContain('tour complete')
+    // The guide's privilege borrow never leaks into the user's mode.
+    expect(state.privileged).toBe(false)
+  }, 60_000)
+})

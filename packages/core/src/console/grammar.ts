@@ -18,6 +18,7 @@ export type ConsoleAction =
   | { kind: 'fidelityReset' }
   | { kind: 'watch'; target: 'indication' }
   | { kind: 'reset' }
+  | { kind: 'tour' }
   | { kind: 'help' }
   | { kind: 'exit' }
   | { kind: 'unknown'; line: string }
@@ -34,6 +35,7 @@ export function parseCommand(raw: string): ConsoleAction {
   if (line === 'disable') return { kind: 'disable' }
   if (line === 'exit' || line === 'quit') return { kind: 'exit' }
   if (line === 'help' || line === '?') return { kind: 'help' }
+  if (line === 'tour') return { kind: 'tour' }
   if (line === 'reset') return { kind: 'reset' }
   if (line === 'fidelity reset') return { kind: 'fidelityReset' }
 
@@ -98,6 +100,7 @@ privileged:
   set thermal-hysteresis <perDegC> [tau <s>] the post-cycle difference knob
   fidelity reset                            the honest twin
   clock mode manual|wall
+  tour                                      the guided first run (the two channels, a load, a sweep, the lying twin)
   watch indication                          stream the indication
   reset                                     power-cycle
   disable | exit`

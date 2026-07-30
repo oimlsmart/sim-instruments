@@ -3,6 +3,7 @@
 // in console/readline.ts (node-only). show indication reads /twin;
 // everything actuating reads /world — the console teaches the split.
 import { parseCommand, PRIVILEGED_KINDS, HELP_TEXT, type ConsoleAction } from './grammar.js'
+import { runTour } from './tour.js'
 
 export interface ConsoleIo {
   /** POST a GraphQL query to a channel path ('/world' | '/twin'). */
@@ -25,6 +26,7 @@ export async function execute(action: ConsoleAction, io: ConsoleIo, state: Conso
   if (action.kind === 'unknown') return `% unknown command '${action.line}' — try 'help'`
   if (PRIVILEGED_KINDS.has(action.kind) && !state.privileged) return `% privileged command — 'enable' first`
   switch (action.kind) {
+    case 'tour': return runTour(io, state)
     case 'help': return HELP_TEXT
     case 'enable': state.privileged = true; return ''
     case 'disable': state.privileged = false; return ''
