@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npx vite build
+      - run: npx astro build
         working-directory: packages/lc500/bench
       - run: test -f packages/lc500/bench/dist/index.html
       - uses: actions/upload-artifact@v4
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npx vite build
+      - run: npx astro build
         working-directory: packages/lc500/bench
       - name: boot sim-lc500 and exercise it
         run: |
@@ -67,7 +67,7 @@ jobs:
             [ "$code" = "200" ] && break; sleep 1
           done
           [ "$code" = "200" ] || { echo "sim did not boot"; exit 1; }
-          curl -s http://localhost:5290/ | grep -q "sim-lc500 bench"
+          curl -s http://localhost:5290/ | grep -q "Primmel SMART Twin Simulator"
           curl -s -X POST http://localhost:5290/world -H 'content-type: application/json' \
             -d '{"query":"mutation { placeLoad(massKg: 40) { groundTruth { appliedLoadKg } } }"}' | grep -q '"appliedLoadKg":40'
           curl -s -X POST http://localhost:5290/twin -H 'content-type: application/json' \
