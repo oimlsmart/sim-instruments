@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { loadKindBenchMeta, fmt } from '../src/lib/kind-meta.js'
 
-describe('@sim/bench — kind-meta loader (TODO 05 scaffolding)', () => {
+describe('@primmel/sst-bench — kind-meta loader (TODO 05 scaffolding)', () => {
   it('loads the R 60 kind package bench.yaml', async () => {
     const meta = await loadKindBenchMeta('primmel-sst-r60')
     expect(meta).not.toBeNull()
@@ -38,7 +38,7 @@ describe('@sim/bench — kind-meta loader (TODO 05 scaffolding)', () => {
   })
 })
 
-describe('@sim/bench — kind-meta fmt helper', () => {
+describe('@primmel/sst-bench — kind-meta fmt helper', () => {
   it('formats a fixed-point value', () => {
     expect(fmt('{:.2f} kg', 40.05)).toBe('40.05 kg')
     expect(fmt('{:.0f} s', 300)).toBe('300 s')

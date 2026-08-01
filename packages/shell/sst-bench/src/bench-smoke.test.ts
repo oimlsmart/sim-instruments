@@ -23,7 +23,7 @@ const DIST = join(BENCH_DIR, 'dist')
 let close: (() => Promise<void>) | undefined
 afterEach(async () => { await close?.(); close = undefined })
 
-describe('@sim/bench (spec §9/§10)', () => {
+describe('@primmel/sst-bench (spec §9/§10)', () => {
   it('astro build produces the servable SPA', async () => {
     if (!existsSync(DIST)) {
       await run('npx', ['astro', 'build'], { cwd: BENCH_DIR, timeout: 120000 })
