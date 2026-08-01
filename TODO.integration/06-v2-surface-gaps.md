@@ -88,6 +88,25 @@ fidelity class has no physics to judge until it lands.
 boot (the probe above is the acceptance: strain ≠ 0 under load; the
 creep-fail sample creeps ≈ coefficient × load × (1 − e^(−t/τ))).
 
+## Gap 4 — the SIM_WORLD_TOKEN guard did not survive the rewrite
+
+v1/legacy: a sim booted with `SIM_WORLD_TOKEN` set rejected token-less
+/world mutations with 401 (`unauthorized: /world mutations require
+Authorization: Bearer <token>`). v2: the same boot answers 200 — the
+guard is gone. The smart repo's guarded round-trip
+(`sim-practice.test.ts`'s TODO.v2/11 suite) probes for the 401 at boot
+and self-skips when absent — it re-arms automatically the day the
+guard returns; no consumer change needed.
+
+Consumer impact: the practice channel's shared-deployment posture (a
+sim on a lab network, students mutating the world) loses its only
+access control; the epistemic wall stays a convention instead of an
+enforcement.
+
+**Ask:** restore the bearer check on /world when SIM_WORLD_TOKEN is
+set (queries stay open, mutations require the token — the v2/11
+semantics, with the 401 message naming the knob).
+
 ## Not gaps (documented here so consumers find the map once)
 
 - **Runtime `scenario(name:)` → boot-time samples** (`run <instance>
