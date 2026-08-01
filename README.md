@@ -1,4 +1,16 @@
+> **MOVED — this repo is archived.** The split it planned is done:
+> the framework lives at **[primmel/sst](https://github.com/primmel/sst)**
+> and the OIML instrument library at
+> **[oimlsmart/sst-instruments](https://github.com/oimlsmart/sst-instruments)**
+> (history preserved via git-filter-repo; v2 is the working branch in
+> both). File issues and PRs there.
+
 # Primmel SST — the Simulated SMART Twin platform
+
+> **Naming** (the ladder): this repo is the SST *framework + the OIML
+> instrument library* today; the planned split (migration report §3a)
+> divides it into `primmel/sst` (the framework, program-agnostic) and
+> `oimlsmart/sst-instruments` (the OIML measuring-instrument library).
 
 A **plug-and-play simulator** for OIML measuring instruments. Each
 instrument kind lives in a self-describing **Primmel SST package** —
