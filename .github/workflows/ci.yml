@@ -111,7 +111,7 @@ jobs:
             echo "acme-lc500 package not present (SIM_ACME_LC500 unset) — the freshness check runs where the smart checkout lives (see AGENTS.md)"
             exit 0
           fi
-          npx tsx packages/lc500/scripts/bake.ts "$SIM_ACME_LC500"
-          git diff --exit-code packages/lc500/twin/lc500.twin.json || { echo "baked contract is stale — re-bake and commit"; exit 1; }
+          npx tsx packages/kinds/sst-r60/scripts/bake.ts "$SIM_ACME_LC500"
+          git diff --exit-code packages/kinds/sst-r60/twin/r60.twin.json || { echo "baked contract is stale — re-bake and commit"; exit 1; }
         env:
           SIM_ACME_LC500: ${{ vars.SIM_ACME_LC500 }}
