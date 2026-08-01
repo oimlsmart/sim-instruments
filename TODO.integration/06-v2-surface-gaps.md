@@ -56,6 +56,38 @@ behavior the kind interface still advertises and nothing can reach.
 stabilized normatively in specs/10 and drop `warming` from the union
 so the interface stops promising a state it can't enter.
 
+## Gap 3 — the mechanical stage does not integrate (strain = 0, creep never develops)
+
+Found by the behavioral legs (behavior-probe's CREEP-CELL and the
+sim acceptance's creep phase — the two legs whose whole job is creep
+physics). Direct probes against a live v2 lc500 (both the `fresh` and
+`creep-fail` samples):
+
+```
+mutation { placeLoad(massKg: 450) { clock } }
+mutation { advanceTime(seconds: 900) { clock } }
+→ /twin indication: 450.05 kg            (no creep; creep-fail expects ≈ 451.8)
+→ /world groundTruth: { appliedLoadKg: 450, strainMm: 0 }   ← the tell
+```
+
+The strain is zero UNDER LOAD — the mechanical stage (strain,
+hysteresis, creep, resonance — `stages/composer.ts`'s own list) is not
+integrating into the served indication. The creep-fail sample's
+overrides (`creep_coefficient: 0.004`, `creep_tau_s: 120` — the keys
+match `coefficients.yaml` and `behavior.ts`'s mapping) make no
+difference, so this is below the sample-override layer: the stage
+itself appears unwired in the data-driven boot. (The reads-0-under-
+load fix, ed86725, restored the ELASTIC indication; the time-domain
+stages did not come with it.)
+
+Consumer impact: every creep/drift leg on the smart side is
+skip-guarded on this gap (named in the suites) — the behavioral
+fidelity class has no physics to judge until it lands.
+
+**Ask:** wire the mechanical stage's integration in the data-driven
+boot (the probe above is the acceptance: strain ≠ 0 under load; the
+creep-fail sample creeps ≈ coefficient × load × (1 − e^(−t/τ))).
+
 ## Not gaps (documented here so consumers find the map once)
 
 - **Runtime `scenario(name:)` → boot-time samples** (`run <instance>
