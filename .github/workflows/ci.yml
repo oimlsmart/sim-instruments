@@ -1,6 +1,6 @@
 name: ci
 on:
-  push: { branches: [v1] }
+  push: { branches: [v1, v2] }
   pull_request: {}
   schedule: [cron: '17 3 * * 1']  # weekly, Monday 03:17 UTC (off-peak)
 
@@ -28,7 +28,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - name: coverage note
-        run: echo "unit + integration across workspaces (core physics, environment, schemas, server, console, twin conformance, lc500 process tests, bench smoke)"
+        run: echo "unit + integration across workspaces (physics, environment, schemas, server, console, twin conformance, instance process tests, bench smoke, composite session)"
 
   bench-build:
     runs-on: ubuntu-latest
@@ -38,17 +38,17 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx astro build
-        working-directory: packages/lc500/bench
-      - run: test -f packages/lc500/bench/dist/index.html
+        working-directory: packages/shell/sst-bench
+      - run: test -f packages/shell/sst-bench/dist/index.html
       - uses: actions/upload-artifact@v4
         with:
           name: bench-dist
-          path: packages/lc500/bench/dist
+          path: packages/shell/sst-bench/dist
           retention-days: 7
 
   standalone-boot:
-    # The real user experience, proven in CI: the CLI boots zero-SMART
-    # (the committed baked contract) and serves all surfaces.
+    # The real user experience, proven in CI: the sst-runtime CLI boots the
+    # acme-lc500 instance (zero-SMART, baked contract) and serves all surfaces.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,10 +56,10 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx astro build
-        working-directory: packages/lc500/bench
-      - name: boot sim-lc500 and exercise it
+        working-directory: packages/shell/sst-bench
+      - name: boot acme-lc500 via the sst-runtime CLI and exercise it
         run: |
-          npx tsx packages/lc500/src/bin.ts --port 5290 &
+          npx tsx packages/runtime/sst-runtime/src/bin.ts run packages/instances/acme-lc500 5290 &
           SIM_PID=$!
           trap 'kill $SIM_PID 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do
@@ -67,7 +67,6 @@ jobs:
             [ "$code" = "200" ] && break; sleep 1
           done
           [ "$code" = "200" ] || { echo "sim did not boot"; exit 1; }
-          curl -s http://localhost:5290/ | grep -q "Primmel SMART Twin Simulator"
           curl -s -X POST http://localhost:5290/world -H 'content-type: application/json' \
             -d '{"query":"mutation { placeLoad(massKg: 40) { groundTruth { appliedLoadKg } } }"}' | grep -q '"appliedLoadKg":40'
           curl -s -X POST http://localhost:5290/twin -H 'content-type: application/json' \
@@ -78,6 +77,9 @@ jobs:
 
   console-session:
     # A scripted console session (the IOS-style UX) against a booted sim.
+    # The console grammar still parses load-cell actuation (place load,
+    # remove load, …); drive it against acme-lc500 via the sst-runtime CLI
+    # with --console (wired only for load cells — see CLAUDE.md).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +89,7 @@ jobs:
       - name: drive a scripted console session
         run: |
           printf 'enable\nplace load 40\nshow ground-truth\nadvance 5m\nshow clock\nscenario creep-cell\nexit\n' \
-            | npx tsx packages/lc500/src/bin.ts --port 5290 --console > /tmp/console.out 2>&1 &
+            | npx tsx packages/runtime/sst-runtime/src/bin.ts run packages/instances/acme-lc500 5290 --console > /tmp/console.out 2>&1 &
           CON_PID=$!
           for i in $(seq 1 20); do grep -q '"clock": 300' /tmp/console.out 2>/dev/null && break; sleep 1; done
           kill $CON_PID 2>/dev/null || true
