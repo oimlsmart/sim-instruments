@@ -94,11 +94,16 @@ root (`ed86725`).
   `smart/scripts/sst-split/RUNBOOK.md`.
 - TODO.integration/15 and /24 close on your side with our commit ids cited.
 
-## The PR
+## The branch — DECIDED: v2 is the trunk
 
-The branch is `v2` against `v1` in this repo. PR pending on your
-confirmation — we can either (a) merge `v2` into `v1` (the integration
-contract is satisfied; the smart side can re-point at `v1` after the
-merge) or (b) leave `v2` as the new working branch and you update the
-smart side's `SIM_INSTRUMENTS_REPO` resolution + the integration
-manifest to track `v2`. Your call.
+The user decided: **v2 is the new working branch**. The default branch
+on this repo has been changed to `v2`. `v1` is preserved as the
+pre-v2 reference (not deleted). The smart side's `SIM_INSTRUMENTS_REPO`
+resolution (or any consumer that references this repo by branch)
+should track `v2`.
+
+With the boundary clean, the SST split executes per
+`smart/scripts/sst-split/RUNBOOK.md` — at that point the framework
+content of `v2` migrates to `primmel/sst` and the OIML instrument
+library migrates to `oimlsmart/sst-instruments`, both carrying
+`v2`'s history forward.
